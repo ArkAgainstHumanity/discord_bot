@@ -25,12 +25,13 @@ import sys
 
 from configparser import ConfigParser
 from discord.ext import commands
+from multiprocessing import cpu_count
 from pyarkon import RCONClient
 from subprocess import PIPE, Popen
 from time import strftime
 
 __author__ = "ArkAgainstHumanity"
-__version__ = "0.4"
+__version__ = "0.41"
 
 config = ConfigParser()
 config_file = os.path.join(os.getcwd(), "conf", "bot.conf")
@@ -78,6 +79,7 @@ bot = commands.Bot(command_prefix="!")
 bot.remove_command("help")
 
 VERSION = re.compile(" \d{7,9} ")
+CPU_COUNT = cpu_count()
 
 
 def reverse_readline(filename, buf_size=2048):
@@ -232,7 +234,8 @@ async def pull_world_chats():
                     if chat_log and chat_log.lower() == "yes":
                         chat_base_path = os.path.join(os.getcwd(), "log")
                         os.makedirs(chat_base_path, exist_ok=True)
-                        with open(os.path.join(chat_base_path, "{}-chat.txt".format(current_map))) as chat_log_file:
+                        out_file = os.path.join(chat_base_path, "{}-chat.txt".format(current_map))
+                        with open(out_file, "a+") as chat_log_file:
                             chat_log_file.write("{} {}\n".format(strftime("[%Y/%m/%d %H:%M:%S]"), msg))
                     # Ignore a bunch of non-chat related server events in the 'getchat' RCON command
                     if msg.startswith(("AdminCmd: ", "SERVER: ", "Command processed")):
@@ -310,6 +313,7 @@ async def online(ctx):
     total = 0
     parse = False
     for line in out.splitlines():
+        server = None
         if line.startswith("Running command"):
             server = line.split("'")[-2]
             servers[server] = []
@@ -320,7 +324,7 @@ async def online(ctx):
             else:
                 parse = True
             continue
-        if parse:
+        if parse and server:
             player = "".join(line[line.index(".")+2:].split(",")[:-1])
             servers[server].append(player)
             total += 1
@@ -435,13 +439,14 @@ async def performance(ctx):
     if allmem:
         output = (
             "```markdown\n"
-            "[Load Average]({0} / 12.00)\n\n"
-            "[Memory Consumption]({1})\n"
-            "[TheIsland]({2})\n"
-            "[TheCenter]({3})\n"
-            "[Scorched]({4})\n"
-            "[Ragnarok]({5})\n"
-            "[CrystalIsles]({6})".format(load, memory, islandmem, centermem, scorchedmem, ragnarokmem, crystalmem)
+            "[Load Average]({0} / {1}.00)\n\n"
+            "[Memory Consumption]({2})\n"
+            "[TheIsland]({3})\n"
+            "[TheCenter]({4})\n"
+            "[Scorched]({5})\n"
+            "[Ragnarok]({6})\n"
+            "[CrystalIsles]({7})".format(load, CPU_COUNT, memory, islandmem, centermem, scorchedmem, ragnarokmem,
+                                         crystalmem)
         )
         output += "\n```"
         await bot.say(output)

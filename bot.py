@@ -233,8 +233,8 @@ async def pull_world_chats():
                         chat_base_path = os.path.join(os.getcwd(), "log")
                         os.makedirs(chat_base_path, exist_ok=True)
                         with open(os.path.join(chat_base_path, "{}-chat.txt".format(current_map))) as chat_log_file:
-                            chat_log_file.write("{} {}".format(strftime("[%Y/%m/%d %H:%M:%S]"), msg))
-
+                            chat_log_file.write("{} {}\n".format(strftime("[%Y/%m/%d %H:%M:%S]"), msg))
+                    # Ignore a bunch of non-chat related server events in the 'getchat' RCON command
                     if msg.startswith(("AdminCmd: ", "SERVER: ", "Command processed")):
                         continue
                     if all(x in msg for x in ["ERROR", "is requested but not installed", "arkmanager"]):
@@ -248,7 +248,7 @@ async def pull_world_chats():
                     # Sanitize the message
                     if "```" in msg:
                         msg = msg.replace("```", "'''")
-                    # Add a timestamp, and convert the message to a 'pre-block'
+                    # Add a timestamp, and convert the message to a 'pre-block' for Discord
                     msg = "```{} {}```".format(strftime("[%Y/%m/%d %H:%M:%S]"), msg)
                     # Send the chat to discord!
                     channel_name = config[current_map]["discord_channel"]

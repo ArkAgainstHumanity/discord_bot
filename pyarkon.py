@@ -30,7 +30,7 @@ class RCONClient(object):
         self.is_authenticated = False
 
     def connect(self):
-        print("Starting connection")
+        #print("Starting connection")
         self.connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connection.settimeout(15)
         unknown_log = False
@@ -39,7 +39,7 @@ class RCONClient(object):
         while self.retries:
             try:
                 self.connection.connect((self.host, self.port))
-                print("Connection established!")
+                #print("Connection established!")
                 return True
             except socket.timeout:
                 self.retries -= 1
@@ -98,7 +98,7 @@ class RCONClient(object):
 
     def send_command(self, command=""):
         if not self.is_authenticated:
-            print("Trying to authenticate")
+            #print("Trying to authenticate")
             self.is_authenticated = True
             self.send_command(command=self.password)
 
@@ -116,11 +116,11 @@ class RCONClient(object):
         data += b"\x00\x00\x00"  # Padding for command type
         data += bytes_command    # The actual command
         data += b"\x00\x00"      # Termination
-        if command == self.password:
-            output = data.replace(bytes_command, b"_redacted_password_")
-            print("Sent: " + repr(output))
-        else:
-            print("Sent: " + repr(data))
+        #if command == self.password:
+        #    output = data.replace(bytes_command, b"_redacted_password_")
+        #    print("Sent: " + repr(output))
+        #else:
+        #    print("Sent: " + repr(data))
 
         self.connection.send(data)
         resp = self.receive_and_parse_data(client_bytes=client_id)
@@ -128,8 +128,8 @@ class RCONClient(object):
         if command == self.password:
             if resp == b"-1":
                 print("Bad RCON password specified")
-            else:
-                print("RCON password accepted")
+            #else:
+            #    print("RCON password accepted")
 
         if resp:
             return resp

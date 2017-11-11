@@ -18,14 +18,60 @@
 import asyncio
 import discord
 import json
+import logging
 import os
 import re
+import sys
 
+from configparser import ConfigParser
 from discord.ext import commands
+from pyarkon import RCONClient
 from subprocess import PIPE, Popen
+from time import strftime
 
 __author__ = "ArkAgainstHumanity"
-__version__ = "0.3"
+__version__ = "0.4"
+
+config = ConfigParser()
+config_file = os.path.join(os.getcwd(), "conf", "bot.conf")
+if not os.path.exists(config_file):
+    print("Error: Config file does not exist at: {}".format(config_file))
+    exit(1)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+config.read(config_file)
+log_type = config["discord"]["logging"]
+if log_type.lower() == "file":
+    config_log_file = config["discord"]["logfile"]
+    if config_log_file.startswith("/"):
+        base_path = "/".join(config_log_file.split("/")[0:-1])
+        if os.path.exists(base_path) and os.path.isdir(base_path):
+            if not os.path.exists(config_log_file):
+                open(config_log_file, "a").close()
+        else:
+            print("Error: Log path {} does not exist, please create it first".format(base_path))
+            exit(1)
+
+    else:
+        base_path = os.path.join(os.getcwd(), "log")
+        if not os.path.exists(base_path):
+            os.mkdir(base_path)
+
+        config_log_file = os.path.join(base_path, config_log_file)
+        open(config_log_file, "a").close()
+
+    handler = logging.FileHandler(config_log_file)
+    formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+elif log_type.lower() == "stdout":
+    handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
 bot = commands.Bot(command_prefix="!")
 # We'll make our own help command
@@ -70,7 +116,7 @@ def reverse_readline(filename, buf_size=2048):
 async def check_world_crashes():
     await bot.wait_until_ready()
     await asyncio.sleep(5)
-    server_object = discord.utils.get(bot.servers, name="Ark Against Humanity")
+    server_object = discord.utils.get(bot.servers, name=config["discord"]["server_name"])
     if not server_object:
         return None
 
@@ -129,90 +175,67 @@ async def check_world_crashes():
 
     return None
 
+
 async def pull_world_chats():
     await bot.wait_until_ready()
     await asyncio.sleep(5)
-    server_object = discord.utils.get(bot.servers, name="Ark Against Humanity")
+    server_object = discord.utils.get(bot.servers, name=config["discord"]["server_name"])
     if not server_object:
         return None
 
     """ Dict structure containing the map name as the key and the value
-        being a tuple of:
-            (Discord.channels Object, chat_log_path, last_log_path)
+        being a Discord object for the channel to store chat logs in.
     """
-    maps = {
-        "theisland": (
-            discord.utils.get(server_object.channels, name="server_theisland"),
-            "/var/log/ark/chat/theisland_chat.txt",
-            os.path.join(os.getcwd(), "chat", "theisland")
-        ),
-        "thecenter": (
-            discord.utils.get(server_object.channels, name="server_thecenter"),
-            "/var/log/ark/chat/thecenter_chat.txt",
-            os.path.join(os.getcwd(), "chat", "thecenter"),
-        ),
-        "scorched": (
-            discord.utils.get(server_object.channels, name="server_scorched"),
-            "/var/log/ark/chat/scorched_chat.txt",
-            os.path.join(os.getcwd(), "chat", "scorched")
-        ),
-        "ragnarok": (
-            discord.utils.get(server_object.channels, name="server_ragnarok"),
-            "/var/log/ark/chat/ragnarok_chat.txt",
-            os.path.join(os.getcwd(), "chat", "ragnarok")
-        ),
-        "crystalisles": (
-            discord.utils.get(server_object.channels, name="server_crystalisles"),
-            "/var/log/ark/chat/crystalisles_chat.txt",
-            os.path.join(os.getcwd(), "chat", "crystalisles")
-        )
-    }
-
-    # Sanity check, for dev discord testing
-    if not maps["theisland"][0]:
-        return None
+    maps = {}
+    for current_map in config["servers"]:
+        maps[current_map] = config[current_map]["discord_channel"]
 
     while not bot.is_closed:
         # Iterate the maps and check for new chat messages to send to discord
         for current_map in maps:
             chats = []
-            first_run = False
-            if not os.path.exists(maps[current_map][2]):
-                first_run = True
+            server_base = config[current_map]["server_path"]
+            game_config_file = os.path.join(server_base, "ShooterGame", "Saved", "Config", "LinuxServer",
+                                            "GameUserSettings.ini")
+            game_config = ConfigParser()
+            game_config.read(game_config_file)
 
-            # If this is not the first run, we know we've stored the last message previously
-            if not first_run:
-                with open(maps[current_map][2], "r") as lfile:
-                    last_message = lfile.read()
-            else:
-                last_message = ""
+            server_ip = config[current_map]["server_ip"]
+            rcon_port = int(game_config["ServerSettings"]["RCONPort"])
+            rcon_password = game_config["ServerSettings"]["ServerAdminPassword"]
+            rcon = RCONClient(server_ip, rcon_port, rcon_password)
+            rcon.connect()
+            chat_buffer = rcon.send_command(command="getchat")
+            rcon.disconnect()
+            if chat_buffer:
+                # No chat logs to get!
+                if chat_buffer == b"Server received, But no response!! \n ":
+                    continue
 
-            # If it is the first run, just load the last 10 lines
-            if first_run:
-                ctr = 0
-                for line in reverse_readline(maps[current_map][1]):
-                    if ctr == 10:
-                        break
-                    chats.append(line)
-                    ctr += 1
-            else:
-                for line in reverse_readline(maps[current_map][1]):
-                    # check if the message was the last known message and stop reading if it is
-                    if line == last_message:
-                        break
-                    chats.append(line)
+                current_string = ""
+                for byte in chat_buffer:
+                    if byte == 10:  # New line
+                        if current_string and current_string.strip():
+                            chats.append(current_string)
+                        current_string = ""
+                    else:
+                        if 31 < byte < 127:
+                            # ASCII, just convert it
+                            current_string += chr(byte)
+                        else:
+                            # Probably some unicode character, hex escape it
+                            current_string += hex(byte).replace("0x", "\\x")
             if chats:
-                # Store the last message if we had any
-                with open(maps[current_map][2], "w") as lfile:
-                    lfile.write(chats[0])
-                # Reverse the order, since we are reading the file backwards
-                for msg in chats[::-1]:
-                    check = msg.split("]")
-                    # Sanity check
-                    if len(check) < 2:
-                        continue
-                    # Ignore Admin/Server command 'chat' logs
-                    if check[1].startswith(("AdminCmd: ", "SERVER: ", "Command processed")):
+                for msg in chats:
+                    chat_log = config[current_map]["save_chat"]
+                    # Log here so we can log admin commands as well
+                    if chat_log and chat_log.lower() == "yes":
+                        chat_base_path = os.path.join(os.getcwd(), "log")
+                        os.makedirs(chat_base_path, exist_ok=True)
+                        with open(os.path.join(chat_base_path, "{}-chat.txt".format(current_map))) as chat_log_file:
+                            chat_log_file.write("{} {}".format(strftime("[%Y/%m/%d %H:%M:%S]"), msg))
+
+                    if msg.startswith(("AdminCmd: ", "SERVER: ", "Command processed")):
                         continue
                     if all(x in msg for x in ["ERROR", "is requested but not installed", "arkmanager"]):
                         continue
@@ -225,12 +248,15 @@ async def pull_world_chats():
                     # Sanitize the message
                     if "```" in msg:
                         msg = msg.replace("```", "'''")
-                    msg = "```{}```".format(msg)
+                    # Add a timestamp, and convert the message to a 'pre-block'
+                    msg = "```{} {}```".format(strftime("[%Y/%m/%d %H:%M:%S]"), msg)
                     # Send the chat to discord!
-                    await bot.send_message(maps[current_map][0], msg)
+                    channel_name = config[current_map]["discord_channel"]
+                    channel_object = discord.utils.get(server_object.channels, name=channel_name)
+                    await bot.send_message(channel_object, msg)
 
         # Sleep for 1 minute, since the chat logs are puller once per minute.
-        await asyncio.sleep(60)
+        await asyncio.sleep(15)
 
 
 @bot.event
@@ -244,18 +270,17 @@ async def checkupdate(ctx):
     if channel not in ["admins", "bot_commands"]:
         return None
 
-    admin_ids = [
-        "_redacted_",
-        "_redacted_",
-        "_redacted_",
-        "_redacted_",
-        "_redacted_",
-    ]
+    config_admin_ids = config["discord"]["admin_ids"]
+    admin_ids = []
+    if config_admin_ids:
+        admin_ids = config_admin_ids.split(",")
+
     admins = []
     server_object = discord.utils.get(bot.servers, name="Ark Against Humanity")
-    for member in server_object.members:
-        if str(member.id) in admin_ids:
-            admins.append(member.mention)
+    if admin_ids:
+        for member in server_object.members:
+            if str(member.id) in admin_ids:
+                admins.append(member.mention)
     # Check for updates
     msg = await bot.say("Checking for update...")
     p = Popen(["arkmanager", "checkupdate", "@theisland"], stdout=PIPE)
@@ -315,7 +340,7 @@ async def multipliers(ctx):
     if channel not in ["admins", "bot_commands"]:
         return None
 
-    multipliers = (
+    important_multipliers = (
         "MatingIntervalMultiplier",
         "EggHatchSpeedMultiplier",
         "BabyMatureSpeedMultiplier",
@@ -331,7 +356,7 @@ async def multipliers(ctx):
         "XPMultiplier",
         "HarvestAmountMultiplier",
     )
-    # /home/ark/arkservers/theisland/ShooterGame/Saved/Config/LinuxServer
+
     gameini = "/home/ark/arkservers/theisland/ShooterGame/Saved/Config/LinuxServer/Game.ini"
     with open(gameini, "r") as gamefile:
         data = gamefile.read()
@@ -339,7 +364,7 @@ async def multipliers(ctx):
     lines = []
     if data:
         for line in data.splitlines():
-            if line.startswith(multipliers):
+            if line.startswith(important_multipliers):
                 lines.append(line)
 
     gameini = "/home/ark/arkservers/theisland/ShooterGame/Saved/Config/LinuxServer/GameUserSettings.ini"
@@ -348,7 +373,7 @@ async def multipliers(ctx):
 
     if data:
         for line in data.splitlines():
-            if line.startswith(multipliers):
+            if line.startswith(important_multipliers):
                 lines.append(line)
     out = "```python\n{}\n```".format("\n".join(lines))
     await bot.say(out)
@@ -608,6 +633,7 @@ async def say(ctx, *args):
         await bot.say("Unknown output: {}".format(out))
     return None
 
+
 @bot.command(pass_context=True)
 async def status(ctx):
     channel = str(ctx.message.channel.name)
@@ -675,4 +701,4 @@ async def help(ctx):
 
 bot.loop.create_task(pull_world_chats())
 bot.loop.create_task(check_world_crashes())
-bot.run("_Put_your_discord_api_key_here")
+bot.run(config["discord"]["apikey"])

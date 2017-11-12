@@ -115,6 +115,24 @@ def reverse_readline(filename, buf_size=2048):
             yield segment
 
 
+def get_rcon_info_from_settings(file_path):
+    # We can't use ConfigParser for GameUserSettings.ini in the instances of having
+    # duplicate keys. (Like multiple OverrideNamedEngramEntries)
+    ret = {"port": None, "password": None}
+    with open(file_path, "r") as settings_file:
+        for line in settings_file:
+            if line.startswith("RCONPort"):
+                ret["port"] = line.split("=")[-1]
+
+            elif line.startswith("ServerAdminPassword"):
+                ret["password"] = line.split("=")[-1]
+
+            if ret["port"] and ret["password"]:
+                return ret
+
+    return {}
+
+
 async def check_world_crashes():
     await bot.wait_until_ready()
     await asyncio.sleep(5)
@@ -170,7 +188,7 @@ async def check_world_crashes():
                 ctr += 1
 
         if next_last_message:
-            with open(last_path, "w") as lfile:
+            with open(last_path, "w+") as lfile:
                 lfile.write(next_last_message)
 
         await asyncio.sleep(60)
@@ -199,13 +217,13 @@ async def pull_world_chats():
             server_base = config[current_map]["server_path"]
             game_config_file = os.path.join(server_base, "ShooterGame", "Saved", "Config", "LinuxServer",
                                             "GameUserSettings.ini")
-            game_config = ConfigParser()
-            game_config.read(game_config_file)
 
             server_ip = config[current_map]["server_ip"]
-            rcon_port = int(game_config["ServerSettings"]["RCONPort"])
-            rcon_password = game_config["ServerSettings"]["ServerAdminPassword"]
-            rcon = RCONClient(server_ip, rcon_port, rcon_password)
+            rcon_info = get_rcon_info_from_settings(game_config_file)
+            if not rcon_info:
+                print("Unable to get RCON Port/Password")
+                return False
+            rcon = RCONClient(server_ip, int(rcon_info["port"]), rcon_info["password"])
             rcon.connect()
             chat_buffer = rcon.send_command(command="getchat")
             rcon.disconnect()

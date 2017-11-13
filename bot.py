@@ -122,10 +122,10 @@ def get_rcon_info_from_settings(file_path):
     with open(file_path, "r") as settings_file:
         for line in settings_file:
             if line.startswith("RCONPort"):
-                ret["port"] = line.split("=")[-1]
+                ret["port"] = line.split("=")[-1].strip()
 
             elif line.startswith("ServerAdminPassword"):
-                ret["password"] = line.split("=")[-1]
+                ret["password"] = line.split("=")[-1].strip()
 
             if ret["port"] and ret["password"]:
                 return ret
@@ -140,7 +140,7 @@ async def check_world_crashes():
     if not server_object:
         return None
 
-    last_path = os.path.join(os.getcwd(), "chat", "crashlog")
+    last_path = os.path.join(os.getcwd(), "log", "crashlog")
     crash_path = "/var/log/arktools/arkserver.log"
     general_chat = discord.utils.get(server_object.channels, name="general")
     admin_chat = discord.utils.get(server_object.channels, name="admins")
@@ -330,8 +330,8 @@ async def online(ctx):
     servers = {}
     total = 0
     parse = False
+    server = None
     for line in out.splitlines():
-        server = None
         if line.startswith("Running command"):
             server = line.split("'")[-2]
             servers[server] = []

@@ -41,9 +41,13 @@ if not os.path.exists(config_file):
     exit(1)
 
 log = logging.getLogger(__name__)
-log.setLevel(logging.INFO)
 
 config.read(config_file)
+if config["discord"]["debug"].lower() == "yes":
+    log.setLevel(logging.DEBUG)
+else:
+    log.setLevel(logging.INFO)
+
 log_type = config["discord"]["logging"]
 if log_type.lower() == "file":
     config_log_file = config["discord"]["logfile"]

@@ -13,11 +13,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import logging
 import socket
 import struct
 import traceback
 
 from random import getrandbits
+
+log = logging.getLogger(__name__)
 
 
 class RCONClient(object):
@@ -30,7 +33,7 @@ class RCONClient(object):
         self.is_authenticated = False
 
     def connect(self):
-        #print("Starting connection")
+        log.debug("Starting connection to {}:{}".format(self.host, self.port))
         self.connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connection.settimeout(15)
         unknown_log = False
@@ -39,29 +42,29 @@ class RCONClient(object):
         while self.retries:
             try:
                 self.connection.connect((self.host, self.port))
-                #print("Connection established!")
+                log.debug("Connection established")
                 return True
             except socket.timeout:
                 self.retries -= 1
             except socket.error as e:
                 if e.errno == 10061:
                     if not refused_log:
-                        print("Connection was refused")
+                        log.error("Connection was refused")
                         refused_log = True
                 if e.errno == 10053:
                     if not aborted_log:
-                        print("Connection was aborted")
+                        log.error("Connection was aborted")
                         aborted_log = True
                 else:
-                    print("Unknown error:\n" + traceback.format_exc())
+                    log.error("Unknown error:\n" + traceback.format_exc())
 
             except Exception as e:
                 self.retries -= 1
                 if not unknown_log:
-                    print("Unknown exception when connecting to RCON service:\n{}".format(e))
+                    log.error("Unknown exception when connecting to RCON service:\n{}".format(e))
                     unknown_log = True
             if not self.retries:
-                print("Exceeded the maximum connection retries for {}:{}, aborting.".format(self.host, self.port))
+                log.error("Exceeded the maximum connection retries for {}:{}, aborting.".format(self.host, self.port))
 
         return False
 
@@ -98,7 +101,7 @@ class RCONClient(object):
 
     def send_command(self, command=""):
         if not self.is_authenticated:
-            #print("Trying to authenticate")
+            log.debug("Attempting to send authentication command")
             self.is_authenticated = True
             self.send_command(command=self.password)
 
@@ -116,20 +119,15 @@ class RCONClient(object):
         data += b"\x00\x00\x00"  # Padding for command type
         data += bytes_command    # The actual command
         data += b"\x00\x00"      # Termination
-        #if command == self.password:
-        #    output = data.replace(bytes_command, b"_redacted_password_")
-        #    print("Sent: " + repr(output))
-        #else:
-        #    print("Sent: " + repr(data))
 
         self.connection.send(data)
         resp = self.receive_and_parse_data(client_bytes=client_id)
 
         if command == self.password:
             if resp == b"-1":
-                print("Bad RCON password specified")
-            #else:
-            #    print("RCON password accepted")
+                log.error("Bad RCON password specified")
+            else:
+                log.debug("RCON password accepted")
 
         if resp:
             return resp

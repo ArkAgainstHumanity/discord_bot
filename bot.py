@@ -27,6 +27,7 @@ from configparser import ConfigParser
 from discord.ext import commands
 from multiprocessing import cpu_count
 from pyarkon import RCONClient
+from pysteamapi import SteamInfo
 from subprocess import PIPE, Popen
 from time import strftime
 
@@ -39,8 +40,8 @@ if not os.path.exists(config_file):
     print("Error: Config file does not exist at: {}".format(config_file))
     exit(1)
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
 
 config.read(config_file)
 log_type = config["discord"]["logging"]
@@ -50,7 +51,7 @@ if log_type.lower() == "file":
         base_path = "/".join(config_log_file.split("/")[0:-1])
         if os.path.exists(base_path) and os.path.isdir(base_path):
             if not os.path.exists(config_log_file):
-                open(config_log_file, "a").close()
+                open(config_log_file, "w+").close()
         else:
             print("Error: Log path {} does not exist, please create it first".format(base_path))
             exit(1)
@@ -64,15 +65,15 @@ if log_type.lower() == "file":
         open(config_log_file, "a").close()
 
     handler = logging.FileHandler(config_log_file)
-    formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
+    formatter = logging.Formatter("%(asctime)s : %(levelname)s : %(message)s")
     handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    log.addHandler(handler)
 
 elif log_type.lower() == "stdout":
     handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
+    formatter = logging.Formatter("%(asctime)s : %(levelname)s : %(message)s")
     handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    log.addHandler(handler)
 
 bot = commands.Bot(command_prefix="!")
 # We'll make our own help command
@@ -100,7 +101,7 @@ def reverse_readline(filename, buf_size=2048):
             # we read
             if segment is not None:
                 # if the previous chunk starts right from the beginning of line
-                # do not concact the segment to the last line of new chunk
+                # do not concat the segment to the last line of new chunk
                 # instead, yield the segment first
                 if buf[-1] is not '\n':
                     lines[-1] += segment
@@ -221,7 +222,7 @@ async def pull_world_chats():
             server_ip = config[current_map]["server_ip"]
             rcon_info = get_rcon_info_from_settings(game_config_file)
             if not rcon_info:
-                print("Unable to get RCON Port/Password")
+                log.error("Unable to get RCON Port/Password")
                 return False
             rcon = RCONClient(server_ip, int(rcon_info["port"]), rcon_info["password"])
             rcon.connect()
@@ -282,7 +283,7 @@ async def pull_world_chats():
 
 @bot.event
 async def on_ready():
-    print("Bot %s has successfully logged in." % bot.user.name)
+    log.info("Bot %s has successfully logged in." % bot.user.name)
 
 
 @bot.command(pass_context=True)
@@ -325,34 +326,33 @@ async def online(ctx):
     if channel not in ["admins", "bot_commands"]:
         return None
 
-    p = Popen(["arkmanager", "rconcmd", "\"listplayers\"", "@all"], stdout=PIPE)
-    out = p.stdout.read().decode("ascii")
-    servers = {}
+    ports = {}
+    for server in config["servers"]:
+        query_port = int(config[server]["query_port"])
+        ports[query_port] = server
+
+    _online = {}
     total = 0
-    parse = False
-    server = None
-    for line in out.splitlines():
-        if line.startswith("Running command"):
-            server = line.split("'")[-2]
-            servers[server] = []
-            continue
-        if line in ['"', ' "', '"No Players Connected ']:
-            if parse:
-                parse = False
-            else:
-                parse = True
-            continue
-        if parse and server:
-            player = "".join(line[line.index(".")+2:].split(",")[:-1])
-            servers[server].append(player)
-            total += 1
-    output = "```\nTotal Players Online: {0}\n".format(total)
-    for server in servers:
-        output += server + ": " + str(len(servers[server])) + "\n"
-        for player in servers[server]:
-            output += "    " + player + "\n"
-    output += "\n```"
-    await bot.say(output)
+    for port in ports:
+        conn = SteamInfo("142.44.142.79", port)
+        players = {}
+        online_players = conn.get_a2s_players()
+        for player in online_players:
+            if player["player_name"]:
+                total += 1
+                players[player["duration"]] = player["player_name"]
+
+        _online[port] = players
+
+    out = "Total Players Online: {}\n".format(total)
+    for port in sorted(ports.keys()):
+        out += "\n__**{}:**__ {}".format(ports.get(port), len(_online[port].keys()))
+        for player in sorted(_online[port].keys(), reverse=True):
+            m, s = divmod(int(player), 60)
+            h, m = divmod(m, 60)
+            out += "\n  *{}* has been online for: {}h {}m {}s".format(_online[port][player], h, m, s)
+
+    await bot.say(out)
     return None
 
 
@@ -468,23 +468,7 @@ async def performance(ctx):
         )
         output += "\n```"
         await bot.say(output)
-    else:
-        missed = []
-        if not load:
-            missed.append("load")
-        if not memory:
-            missed.append("memory")
-        if not islandmem:
-            missed.append("island")
-        if not centermem:
-            missed.append("center")
-        if not scorchedmem:
-            missed.append("scorched")
-        if not ragnarokmem:
-            missed.append("ragnarok")
-        if not crystalmem:
-            missed.append("crystal")
-        print("Missed: {}".format(",".join(missed)))
+
     return None
 
 

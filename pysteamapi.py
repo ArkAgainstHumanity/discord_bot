@@ -13,9 +13,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import logging
 import struct
 
 from socket import AF_INET, SOCK_DGRAM, socket
+
+log = logging.getLogger(__name__)
 
 
 class SteamInfo(object):
@@ -49,7 +52,7 @@ class SteamInfo(object):
         self.sock.sendto(b"\xff\xff\xff\xffTSource Engine Query\x00", self.connect)
         data = self.sock.recv(1024*12)
         if not data[0:5] == b"\xff\xff\xff\xff\x49":
-            print("Error: unexpected A2S_INFO response")
+            log.error("Unexpected A2S_INFO response")
             return output
 
         output["protocol"] = data[5]
@@ -167,9 +170,9 @@ class SteamInfo(object):
                 return rules
 
             else:
-                print("Error: unexpected A2S_RULES response")
+                log.error("Unexpected A2S_RULES response")
         else:
-            print("Error: unexpected A2S_RULES knock")
+            log.error("Unexpected A2S_RULES knock")
 
         return {}
 
@@ -177,32 +180,34 @@ class SteamInfo(object):
         self.sock.sendto(b"\xff\xff\xff\xff\x55\xff\xff\xff\xff", self.connect)
         data = self.sock.recv(1024*12)
         if len(data) > 5 and data[0:5] == b"\xff\xff\xff\xff\x41":
-            print("Received A2S_PLAYER knock response, ACK'ing...")
             knock_resp = b"\xff\xff\xff\xff\x55" + data[-4:]
             self.sock.sendto(knock_resp, self.connect)
             data = self.sock.recv(1024 * 12)
             if len(data) > 5 and data[0:5] == b"\xff\xff\xff\xff\x44":
-                print("Received A2S_PLAYER response")
                 idx = 5
                 player_count = data[idx]
                 idx += 1
                 players = []
                 for item in range(player_count):
-                    player = {}
-                    player["index"] = data[idx]
+                    player_index = data[idx]
                     idx += 1
-                    player["player_name"], idx = self.parse_until_null(data, idx)
-                    player["score"] = struct.unpack("l", data[idx:idx + 4])[0]
+                    player_name, idx = self.parse_until_null(data, idx)
+                    score = struct.unpack("i", data[idx:idx + 4])[0]
                     idx += 4
-                    player["duration"] = struct.unpack("f", data[idx:idx + 4])[0]
+                    duration = struct.unpack("f", data[idx:idx + 4])[0]
                     idx += 4
-                    players.append(player)
+                    players.append({
+                        "index": player_index,
+                        "player_name": player_name,
+                        "score": score,
+                        "duration": duration
+                    })
                 return players
 
             else:
-                print("Error: unexpected A2S_PLAYER response")
+                log.error("Unexpected A2S_PLAYER response")
         else:
-            print("Error: unexpected A2S_PLAYER knock")
+            log.error("Unexpected A2S_PLAYER knock")
 
         return {}
 

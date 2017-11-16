@@ -44,7 +44,7 @@ class RCONClient(object):
                 self.connection.connect((self.host, self.port))
                 log.debug("Connection established")
                 return True
-            except socket.timeout:
+            except (socket.timeout, ConnectionAbortedError, ConnectionRefusedError):
                 self.retries -= 1
             except socket.error as e:
                 if e.errno == 10061:
@@ -73,7 +73,11 @@ class RCONClient(object):
             self.connection.close()
 
     def receive_and_parse_data(self, client_bytes=b"\x00\x00\x00\x00"):
-        data = self.connection.recv(1024*12)
+        try:
+            data = self.connection.recv(1024*12)
+        except socket.timeout:
+            return None
+
         if len(data) < 12:
             return None
 
@@ -120,7 +124,11 @@ class RCONClient(object):
         data += bytes_command    # The actual command
         data += b"\x00\x00"      # Termination
 
-        self.connection.send(data)
+        try:
+            self.connection.send(data)
+        except socket.timeout:
+            return None
+
         resp = self.receive_and_parse_data(client_bytes=client_id)
 
         if command == self.password:

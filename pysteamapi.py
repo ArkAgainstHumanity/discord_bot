@@ -49,8 +49,12 @@ class SteamInfo(object):
 
     def get_a2s_info(self):
         output = {}
-        self.sock.sendto(b"\xff\xff\xff\xffTSource Engine Query\x00", self.connect)
-        data = self.sock.recv(1024*12)
+        try:
+            self.sock.sendto(b"\xff\xff\xff\xffTSource Engine Query\x00", self.connect)
+            data = self.sock.recv(1024*12)
+        except socket.timeout:
+            return output
+
         if not data[0:5] == b"\xff\xff\xff\xff\x49":
             log.error("Unexpected A2S_INFO response")
             return output
@@ -141,8 +145,12 @@ class SteamInfo(object):
         return output
 
     def get_a2s_rules(self):
-        self.sock.sendto(b"\xff\xff\xff\xff\x56\x00\x00\x00\x00", self.connect)
-        data = self.sock.recv(1024*12)
+        try:
+            self.sock.sendto(b"\xff\xff\xff\xff\x56\x00\x00\x00\x00", self.connect)
+            data = self.sock.recv(1024*12)
+        except socket.timeout:
+            return {}
+
         if len(data) > 5 and data[0:5] == b"\xff\xff\xff\xff\x41":
             knock_resp = b"\xff\xff\xff\xff\x56" + data[-4:]
             self.sock.sendto(knock_resp, self.connect)
@@ -177,8 +185,12 @@ class SteamInfo(object):
         return {}
 
     def get_a2s_players(self):
-        self.sock.sendto(b"\xff\xff\xff\xff\x55\xff\xff\xff\xff", self.connect)
-        data = self.sock.recv(1024*12)
+        try:
+            self.sock.sendto(b"\xff\xff\xff\xff\x55\xff\xff\xff\xff", self.connect)
+            data = self.sock.recv(1024*12)
+        except socket.timeout:
+            return {}
+
         if len(data) > 5 and data[0:5] == b"\xff\xff\xff\xff\x41":
             knock_resp = b"\xff\xff\xff\xff\x55" + data[-4:]
             self.sock.sendto(knock_resp, self.connect)

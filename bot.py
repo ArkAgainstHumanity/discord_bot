@@ -23,11 +23,13 @@ import os
 import re
 import sys
 
+from bs4 import BeautifulSoup
 from configparser import ConfigParser
 from discord.ext import commands
 from multiprocessing import cpu_count
 from pyarkon import RCONClient
 from pysteamapi import SteamInfo
+from requests import get
 from subprocess import PIPE, Popen
 from time import strftime
 
@@ -84,6 +86,7 @@ bot = commands.Bot(command_prefix="!")
 bot.remove_command("help")
 
 VERSION = re.compile(" \d{7,9} ")
+PATCH_VERSION = re.compile("^v\d{3,4}\.\d{1,5}$")
 CPU_COUNT = cpu_count()
 
 
@@ -118,6 +121,25 @@ def reverse_readline(filename, buf_size=2048):
         # Don't yield None if the file was empty
         if segment is not None:
             yield segment
+
+
+def remove_html_markup(s):
+    # From: https://stackoverflow.com/a/14464496
+    tag = False
+    quote = False
+    out = ""
+
+    for c in s:
+            if c == '<' and not quote:
+                tag = True
+            elif c == '>' and not quote:
+                tag = False
+            elif (c == '"' or c == "'") and tag:
+                quote = not quote
+            elif not tag:
+                out = out + c
+
+    return out
 
 
 def get_rcon_info_from_settings(file_path):
@@ -281,8 +303,47 @@ async def pull_world_chats():
                     channel_object = discord.utils.get(server_object.channels, name=channel_name)
                     await bot.send_message(channel_object, msg)
 
-        # Sleep for 1 minute, since the chat logs are puller once per minute.
         await asyncio.sleep(15)
+
+
+async def check_new_patch_notes():
+    await bot.wait_until_ready()
+    await asyncio.sleep(10)
+    server_object = discord.utils.get(bot.servers, name=config["discord"]["server_name"])
+    if not server_object:
+        return None
+
+    channel_object = discord.utils.get(server_object.channels, name="patch_notes")
+    while not bot.is_closed:
+        r = get("https://steamcommunity.com/app/346110/discussions/0/594820656447032287/")
+        soup = BeautifulSoup(r.text, "html.parser")
+        post = soup.find("div", class_="forum_op")
+        data = post.find("div", class_="content").contents
+        # TODO: Handle first-run file creation and add config settings
+        with open(os.path.join(os.getcwd(), "log", "versionlog"), "r") as vfile:
+            last_version = vfile.read()
+
+        output = ""
+        start_parse = False
+        for line in data:
+            tmp = remove_html_markup(line)
+            if tmp:
+                if PATCH_VERSION.match(tmp):
+                    if output:
+                        output = "```\n" + output + "\n```"
+                        await bot.send_message(channel_object, output)
+                    if not start_parse:
+                        start_parse = True
+                    if start_parse:
+                        output = ""
+                        output += tmp
+                        if tmp == last_version:
+                            break
+                else:
+                    if start_parse:
+                        output += "\n" + tmp
+
+        await asyncio.sleep(900)
 
 
 @bot.event
@@ -712,4 +773,5 @@ async def help(ctx):
 
 bot.loop.create_task(pull_world_chats())
 bot.loop.create_task(check_world_crashes())
+bot.loop.create_task(check_new_patch_notes())
 bot.run(config["discord"]["apikey"])

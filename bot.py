@@ -315,6 +315,7 @@ async def check_new_patch_notes():
 
     channel_object = discord.utils.get(server_object.channels, name="patch_notes")
     while not bot.is_closed:
+        version = ""
         r = get("https://steamcommunity.com/app/346110/discussions/0/594820656447032287/")
         soup = BeautifulSoup(r.text, "html.parser")
         post = soup.find("div", class_="forum_op")
@@ -329,6 +330,8 @@ async def check_new_patch_notes():
             tmp = remove_html_markup(line)
             if tmp:
                 if PATCH_VERSION.match(tmp):
+                    if not version:
+                        version = tmp
                     if output:
                         output = "```\n" + output + "\n```"
                         await bot.send_message(channel_object, output)
@@ -342,6 +345,10 @@ async def check_new_patch_notes():
                 else:
                     if start_parse:
                         output += "\n" + tmp
+
+        if version != last_version:
+            with open(os.path.join(os.getcwd(), "log", "versionlog"), "w") as vfile:
+                vfile.write(version)
 
         await asyncio.sleep(900)
 

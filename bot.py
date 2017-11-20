@@ -569,18 +569,20 @@ async def mods(ctx):
         return None
 
     out = (
+        "Structures Plus: "
+        "<https://steamcommunity.com/sharedfiles/filedetails/changelog/731604991>\n"
+        "eco's RP Decor: "
+        "<https://steamcommunity.com/sharedfiles/filedetails/changelog/741203089>\n"
+        "Stairs Mod with Rounded Walls: "
+        "<https://steamcommunity.com/sharedfiles/filedetails/changelog/520879363>\n"
         "Death Helper: "
         "<https://steamcommunity.com/sharedfiles/filedetails/changelog/566885854>\n"
         "Pet Finder: "
         "<https://steamcommunity.com/sharedfiles/filedetails/changelog/566887000>\n"
-        "Stairs Mod with Rounded Walls: "
-        "<https://steamcommunity.com/sharedfiles/filedetails/changelog/520879363>\n"
-        "Structures Plus: "
-        "<https://steamcommunity.com/sharedfiles/filedetails/changelog/731604991>\n"
         "Super Spyglass: "
         "<https://steamcommunity.com/sharedfiles/filedetails/changelog/793605978>\n"
         "Iso: Crystal Isles (Map, optional): "
-        "<https://steamcommunity.com/sharedfiles/filedetails/?id=804312798>"
+        "<https://steamcommunity.com/sharedfiles/filedetails/changelog/804312798>"
     )
     await bot.say(out)
     return None

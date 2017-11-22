@@ -45,10 +45,10 @@ class RCONClient(object):
                 log.debug("Connection established")
                 return True
             except (socket.timeout, ConnectionAbortedError, ConnectionRefusedError):
-                self.connection.close()
+                self.disconnect()
                 self.retries -= 1
             except socket.error as e:
-                self.connection.close()
+                self.disconnect()
                 if e.errno == 10061:
                     if not refused_log:
                         log.error("Connection was refused")
@@ -61,7 +61,7 @@ class RCONClient(object):
                     log.error("Unknown error:\n" + traceback.format_exc())
 
             except Exception as e:
-                self.connection.close()
+                self.disconnect()
                 self.retries -= 1
                 if not unknown_log:
                     log.error("Unknown exception when connecting to RCON service:\n{}".format(e))
@@ -80,6 +80,7 @@ class RCONClient(object):
         try:
             data = self.connection.recv(1024*12)
         except socket.timeout:
+            self.disconnect()
             return None
 
         if len(data) < 12:
@@ -132,11 +133,11 @@ class RCONClient(object):
             self.connection.send(data)
         except socket.timeout:
             log.error("Socket timeout handled, connection closed")
-            self.connection.close()
+            self.disconnect()
             return None
         except BrokenPipeError:
             log.error("Broken pipe handled, connection closed")
-            self.connection.close()
+            self.disconnect()
             return None
 
         resp = self.receive_and_parse_data(client_bytes=client_id)

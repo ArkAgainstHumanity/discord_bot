@@ -53,6 +53,7 @@ class SteamInfo(object):
             self.sock.sendto(b"\xff\xff\xff\xffTSource Engine Query\x00", self.connect)
             data = self.sock.recv(1024*12)
         except socket.timeout:
+            self.sock.close()
             return output
 
         if not data[0:5] == b"\xff\xff\xff\xff\x49":
@@ -149,6 +150,7 @@ class SteamInfo(object):
             self.sock.sendto(b"\xff\xff\xff\xff\x56\x00\x00\x00\x00", self.connect)
             data = self.sock.recv(1024*12)
         except socket.timeout:
+            self.sock.close()
             return {}
 
         if len(data) > 5 and data[0:5] == b"\xff\xff\xff\xff\x41":
@@ -189,6 +191,7 @@ class SteamInfo(object):
             self.sock.sendto(b"\xff\xff\xff\xff\x55\xff\xff\xff\xff", self.connect)
             data = self.sock.recv(1024*12)
         except socket.timeout:
+            self.sock.close()
             return {}
 
         if len(data) > 5 and data[0:5] == b"\xff\xff\xff\xff\x41":

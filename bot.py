@@ -319,7 +319,16 @@ async def check_new_patch_notes():
         r = get("https://steamcommunity.com/app/346110/discussions/0/594820656447032287/")
         soup = BeautifulSoup(r.text, "html.parser")
         post = soup.find("div", class_="forum_op")
-        data = post.find("div", class_="content").contents
+        if not post:
+            log.warning("No Steam Forum Post OP found")
+            return None
+
+        data = post.find("div", class_="content")
+        if not data:
+            log.warning("No data found in Steam Forum Post")
+            return None
+
+        data = data.contents
         # TODO: Handle first-run file creation and add config settings
         with open(os.path.join(os.getcwd(), "log", "versionlog"), "r") as vfile:
             last_version = vfile.read()

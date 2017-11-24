@@ -33,14 +33,14 @@ class RCONClient(object):
         self.is_authenticated = False
 
     def connect(self):
-        log.debug("Starting connection to {}:{}".format(self.host, self.port))
-        self.connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connection.settimeout(15)
         unknown_log = False
         refused_log = False
         aborted_log = False
         while self.retries:
             try:
+                log.debug("Starting connection to {}:{}".format(self.host, self.port))
+                self.connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.connection.settimeout(15)
                 self.connection.connect((self.host, self.port))
                 log.debug("Connection established")
                 return True
@@ -131,17 +131,22 @@ class RCONClient(object):
 
         try:
             self.connection.send(data)
+            has_exception = False
         except socket.timeout:
             log.error("Socket timeout handled, connection closed")
-            self.disconnect()
-            return None
+            has_exception = True
         except BrokenPipeError:
             log.error("Broken pipe handled, connection closed")
+            has_exception = True
+        except OSError:
+            log.error("Bad file descriptor, socket was closed prematurely or has gone stale after authenticating")
+            has_exception = True
+
+        if has_exception:
             self.disconnect()
             return None
 
         resp = self.receive_and_parse_data(client_bytes=client_id)
-
         if command == self.password:
             if resp == b"-1":
                 log.error("Bad RCON password specified")

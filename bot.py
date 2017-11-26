@@ -834,7 +834,7 @@ async def help(ctx):
             "!showmotd     Shows the message of the dat on all maps\n"
             "```"
         )
-        await bot.sat(out)
+        await bot.say(out)
 
     return None
 

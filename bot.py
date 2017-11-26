@@ -560,12 +560,8 @@ async def vote(ctx):
         return None
 
     out = (
-        "ARKServers: (Vote requires website login)\n"
-        "    <https://arkservers.net/1/name/asc/?term=ArkAgainstHumanity[PVEx3>\n\n"
-        "TOP ARKServers: (Vote requires website login)\n"
-        "    <https://toparkservers.com/1/search/?term=ArkAgainstHumanity%5BPVEx3>\n\n"
         "ARK-Servers: (Vote requires steam login)\n"
-        "    <https://ark-servers.net/group/229/>"
+        "    <https://ark-servers.net/group/295/>"
     )
     await bot.say(out)
     return None
@@ -765,6 +761,46 @@ async def status(ctx):
 
 
 @bot.command(pass_context=True)
+async def updatemaps(ctx):
+    channel = str(ctx.message.channel.name)
+    if channel != "admins":
+        return None
+
+    await bot.say("Command not implemented yet")
+    return None
+
+
+@bot.command(pass_context=True)
+async def rebootmaps(ctx):
+    channel = str(ctx.message.channel.name)
+    if channel != "admins":
+        return None
+
+    await bot.say("Command not implemented yet")
+    return None
+
+
+@bot.command(pass_context=True)
+async def setmotd(ctx):
+    channel = str(ctx.message.channel.name)
+    if channel != "admins":
+        return None
+
+    await bot.say("Command not implemented yet")
+    return None
+
+
+@bot.command(pass_context=True)
+async def showmotd(ctx):
+    channel = str(ctx.message.channel.name)
+    if channel != "admins":
+        return None
+
+    await bot.say("Command not implemented yet")
+    return None
+
+
+@bot.command(pass_context=True)
 async def help(ctx):
     channel = str(ctx.message.channel.name)
     if channel not in ["admins", "bot_commands"]:
@@ -784,9 +820,22 @@ async def help(ctx):
         "!getarkname    Show the name that you set to be used for the !say command\n"
         "!setarkname    Set a name to be used for the !say command\n"
         "!say           A message to be sent to a server, only works in server_ channels\n"
-        "\nPing us if you have any feature requests!```"
+        "\nPing us if you have any feature requests!\n"
+        "```"
     )
     await bot.say(out)
+
+    if channel == "admins":
+        out = (
+            "```Admin Commands:\n"
+            "!updatemaps   Runs a full update (ARK and Mods) for all maps. 15 minute grace period to log out\n"
+            "!rebootmaps   Reboots all of the maps. 15 minute grace period to log out\n"
+            "!setmotd      Sets the message of the day on all maps\n"
+            "!showmotd     Shows the message of the dat on all maps\n"
+            "```"
+        )
+        await bot.sat(out)
+
     return None
 
 bot.loop.create_task(pull_world_chats())

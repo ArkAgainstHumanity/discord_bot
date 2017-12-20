@@ -540,7 +540,7 @@ async def performance(ctx):
             scorchedmem = line.split()[5]
         elif "ShooterGameServer Ragnarok" in line:
             ragnarokmem = line.split()[5]
-        elif "SgooterGameServer Aberration" in line:
+        elif "ShooterGameServer Aberration" in line:
             aberrationmem = line.split()[5]
         elif "ShooterGameServer Crystal" in line:
             crystalmem = line.split()[5]

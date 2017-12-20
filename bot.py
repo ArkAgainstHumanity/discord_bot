@@ -556,7 +556,7 @@ async def performance(ctx):
             "[TheCenter]({4})\n"
             "[Scorched]({5})\n"
             "[Ragnarok]({6})\n"
-            "[Aberration]{{7})\n"
+            "[Aberration]({7})\n"
             "[CrystalIsles]({8})".format(load, CPU_COUNT, memory, islandmem, centermem, scorchedmem, ragnarokmem,
                                          aberrationmem, crystalmem)
         )

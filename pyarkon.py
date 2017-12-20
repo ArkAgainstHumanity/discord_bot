@@ -79,7 +79,7 @@ class RCONClient(object):
     def receive_and_parse_data(self, client_bytes=b"\x00\x00\x00\x00"):
         try:
             data = self.connection.recv(1024*12)
-        except socket.timeout:
+        except (socket.timeout, ConnectionResetError, ConnectionRefusedError):
             self.disconnect()
             return None
 

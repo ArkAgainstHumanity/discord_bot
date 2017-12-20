@@ -321,12 +321,14 @@ async def check_new_patch_notes():
         post = soup.find("div", class_="forum_op")
         if not post:
             log.warning("No Steam Forum Post OP found")
-            return None
+            await asyncio.sleep(900)
+            continue
 
         data = post.find("div", class_="content")
         if not data:
             log.warning("No data found in Steam Forum Post")
-            return None
+            await asyncio.sleep(900)
+            continue
 
         data = data.contents
         # TODO: Handle first-run file creation and add config settings
@@ -336,13 +338,18 @@ async def check_new_patch_notes():
         output = ""
         start_parse = False
         for line in data:
-            tmp = remove_html_markup(line)
+            tmp = None
+            line = str(line)
+            if line and line.strip() and line.strip() in ["<br>", "<br/>"]:
+                tmp = "\n"
+            elif line:
+                tmp = remove_html_markup(line)
             if tmp:
                 if PATCH_VERSION.match(tmp):
                     if not version:
                         version = tmp
                     if output:
-                        output = "```\n" + output + "\n```"
+                        output = "```\n" + output.replace("\n\n", "\n").strip() + "\n```"
                         await bot.send_message(channel_object, output)
                     if not start_parse:
                         start_parse = True
@@ -360,6 +367,8 @@ async def check_new_patch_notes():
                 vfile.write(version)
 
         await asyncio.sleep(900)
+
+    await asyncio.sleep(900)
 
 
 @bot.event
@@ -513,6 +522,7 @@ async def performance(ctx):
     centermem = "N/A"
     scorchedmem = "N/A"
     ragnarokmem = "N/A"
+    aberrationmem = "N/A"
     crystalmem = "N/A"
     allmem = False
     for line in stripped.splitlines():
@@ -530,9 +540,11 @@ async def performance(ctx):
             scorchedmem = line.split()[5]
         elif "ShooterGameServer Ragnarok" in line:
             ragnarokmem = line.split()[5]
+        elif "SgooterGameServer Aberration" in line:
+            aberrationmem = line.split()[5]
         elif "ShooterGameServer Crystal" in line:
             crystalmem = line.split()[5]
-        if load and ragnarokmem and scorchedmem and centermem and islandmem and crystalmem and memory:
+        if load and aberrationmem and ragnarokmem and scorchedmem and centermem and islandmem and crystalmem and memory:
             allmem = True
 
     if allmem:
@@ -544,8 +556,9 @@ async def performance(ctx):
             "[TheCenter]({4})\n"
             "[Scorched]({5})\n"
             "[Ragnarok]({6})\n"
-            "[CrystalIsles]({7})".format(load, CPU_COUNT, memory, islandmem, centermem, scorchedmem, ragnarokmem,
-                                         crystalmem)
+            "[Aberration]{{7})\n"
+            "[CrystalIsles]({8})".format(load, CPU_COUNT, memory, islandmem, centermem, scorchedmem, ragnarokmem,
+                                         aberrationmem, crystalmem)
         )
         output += "\n```"
         await bot.say(output)
